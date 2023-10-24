@@ -6,6 +6,7 @@ from a scrambled string)
 
 import flask
 import logging
+from flask import request
 
 # Our modules
 from src.letterbag import LetterBag
@@ -136,6 +137,58 @@ def example():
     app.logger.debug("Got a JSON request")
     rslt = {"key": "value"}
     return flask.jsonify(result=rslt)
+
+
+@app.route("/_action")
+def action():
+    """
+    Example ajax request handler
+    """
+    text = request.args.get("text", type=str)
+    jumble = flask.session["jumble"]
+    matches = flask.session.get("matches", [])
+
+    in_jumble = LetterBag(jumble).contains(text)
+    matched = WORDS.has(text)
+
+
+    rslt = {}
+    if matched and in_jumble and not (text in matches):
+        # Cool, they found a new word
+        rslt["result"] = True
+        matches.append(text)
+        rslt["resultdone"] = len(matches) >= flask.session["target_count"]
+        flask.session["matches"] = matches
+    elif text in matches:
+        rslt["message"] = "You already found {}".format(text)
+        #flask.flash("You already found {}".format(text))
+    elif not matched:
+        #flask.flash("{} isn't in the list of words".format(text))
+        rslt["message"] = "{} isn't in the list of words".format(text)
+    elif not in_jumble:
+        #flask.flash(
+        rslt["message"] = '"{}" can\'t be made from the letters {}'.format(text, jumble)
+    else:
+        app.logger.debug("This case shouldn't happen!")
+        assert False  # Raises AssertionError
+
+    # Choose page:  Solved enough, or keep going?
+    if len(matches) >= flask.session["target_count"]:
+       return flask.redirect(flask.url_for("success"))
+    else:
+       return flask.jsonify(result=rslt)
+    
+    
+
+    
+    
+    #rslt["new_word"] = (matched and in_jumble and not (text in matches))
+    #rslt["matches"] = matches
+    #rslt["used_word"] = text in matches
+    #rslt["word_not_jum"] = not in_jumble
+    #rslt["not_in_match"] = not matched
+    #rslt["reach_target"] = len(matches) >= flask.session["target_count"]
+    #return flask.jsonify(result=rslt)
 
 
 #################
